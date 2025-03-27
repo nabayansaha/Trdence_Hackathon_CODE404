@@ -1,3 +1,6 @@
+from typing import Any, Dict, List
+from pydantic import BaseModel, Field, ConfigDict
+
 class MnAagentState(BaseModel):
     company_a_name: str = Field(description="Name of the first company being analyzed")
     company_b_name: str = Field(description="Name of the second company being analyzed")
