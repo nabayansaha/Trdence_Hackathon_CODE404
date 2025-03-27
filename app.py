@@ -1,171 +1,226 @@
 import streamlit as st
-from datetime import datetime
+from utils.chat import Chat
+from utils.messages import HumanMessage, AIMessage
+import pandas as pd
+import matplotlib.pyplot as plt
+import altair as alt
 
 # Set page configuration
 st.set_page_config(
-    page_title="SAMAR.AI - Merger & Acquisition Platform",
+    page_title="SAMAR.AI - M&A Analysis Platform",
     page_icon="💼",
-    initial_sidebar_state="expanded"
+    layout="wide"
 )
 
-# Apply minimal custom CSS
-st.markdown("""
-<style>
-    .main-header {
-        font-size: 2rem;
-        color: #1E3A8A;
-        text-align: center;
-        margin-bottom: 1rem;
-    }
-    .section-header {
-        font-size: 1.2rem;
-        font-weight: bold;
-        margin-top: 1rem;
-        margin-bottom: 0.5rem;
-    }
-</style>
-""", unsafe_allow_html=True)
+# Initialize Chat instance
+@st.cache_resource
+def get_chat_instance():
+    return Chat()
 
-# Header
-st.markdown("<h1 class='main-header'>SAMAR.AI</h1>", unsafe_allow_html=True)
-st.markdown("<h3 style='text-align: center;'>Merger & Acquisition Assistant</h3>", unsafe_allow_html=True)
+chat_instance = get_chat_instance()
 
-# Sidebar
-st.sidebar.title("Navigation")
+# App header
+col1, col2 = st.columns([3, 1])
+with col1:
+    st.title("🚀 SAMAR.AI")
+    st.subheader("Strategic Acquisition & Merger Analysis Resource")
+with col2:
+    st.image("https://via.placeholder.com/150?text=SAMAR.AI", width=150)
 
-page = st.sidebar.radio("", [
-    "Dashboard", 
-    "Deal Pipeline", 
-    "Company Analysis", 
-    "Deal Valuation",
-    "Due Diligence"
-])
-
-st.sidebar.markdown("---")
-st.sidebar.markdown("### User Information")
-st.sidebar.markdown(f"**Username:** bibhabasuiitkgp")
-st.sidebar.markdown(f"**Date:** 2025-03-27")
-st.sidebar.markdown(f"**Time:** 04:17:49 UTC")
-st.sidebar.markdown("**Role:** M&A Analyst")
-
-# Main content based on selected page
-if page == "Dashboard":
-    st.header("M&A Dashboard")
-    
-    st.subheader("Summary")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Active Deals", "7")
-    col2.metric("Completed This Quarter", "3")
-    col3.metric("Total Deal Value ($M)", "1,350")
-    
-    st.markdown("### Recent Activities")
-    st.write("- Due diligence completed for TechCorp acquisition (March 25, 2025)")
-    st.write("- Initial valuation report for AgriSystems received (March 24, 2025)")
-    st.write("- MedInnovate negotiations entered final stage (March 22, 2025)")
-    st.write("- FinServe deal successfully closed (March 20, 2025)")
-    
-    st.markdown("### Upcoming Deadlines")
-    st.write("- CloudSoft financial review (March 29, 2025)")
-    st.write("- EnergyPlus initial proposal submission (March 31, 2025)")
-    st.write("- RetailGiant board presentation (April 2, 2025)")
-
-elif page == "Deal Pipeline":
-    st.header("Deal Pipeline")
-    
-    st.subheader("Active Deals")
-    st.table({
-        'Company': ['TechCorp', 'AgriSystems', 'MedInnovate', 'RetailGiant', 'EnergyPlus', 'CloudSoft'],
-        'Industry': ['Technology', 'Agriculture', 'Healthcare', 'Retail', 'Energy', 'Technology'],
-        'Deal Size ($M)': [450, 120, 280, 320, 180, 390],
-        'Stage': ['Due Diligence', 'Prospecting', 'Negotiation', 'Negotiation', 'Prospecting', 'Due Diligence'],
-        'Expected Close': ['2025-04-15', '2025-06-30', '2025-05-10', '2025-04-22', '2025-07-15', '2025-05-05']
-    })
-    
-    st.subheader("Add New Deal")
-    with st.form("new_deal_form"):
-        st.text_input("Company Name")
-        st.selectbox("Industry", ["Technology", "Healthcare", "Finance", "Retail", "Energy", "Manufacturing", "Agriculture", "Other"])
-        st.number_input("Estimated Deal Size ($M)", min_value=1, max_value=10000)
-        st.selectbox("Current Stage", ["Initial Contact", "Prospecting", "Negotiation", "Due Diligence", "Closing"])
-        st.date_input("Expected Closing Date")
-        st.text_area("Deal Notes")
-        st.form_submit_button("Add Deal")
-
-elif page == "Company Analysis":
-    st.header("Company Analysis")
-    
-    st.selectbox("Select Company", ["TechCorp", "AgriSystems", "MedInnovate", "FinServe", "RetailGiant", "EnergyPlus", "CloudSoft"])
-    
-    st.subheader("Company Overview")
-    st.write("**Industry:** Technology")
-    st.write("**Founded:** 2010")
-    st.write("**Employees:** 450")
-    st.write("**Annual Revenue:** $85M")
-    st.write("**Growth Rate:** 15% YoY")
-    
-    st.subheader("Financial Summary")
-    st.write("**Revenue (FY 2024):** $85M")
-    st.write("**EBITDA Margin:** 22%")
-    st.write("**Net Income:** $12.5M")
-    st.write("**Cash Reserves:** $18M")
-    st.write("**Debt:** $7M")
-    
-    st.subheader("Key Products")
-    st.write("1. Enterprise Analytics Platform")
-    st.write("2. Mobile Data Security Suite")
-    st.write("3. Cloud Integration Services")
-
-elif page == "Deal Valuation":
-    st.header("Deal Valuation")
-    
-    st.selectbox("Select Target Company", ["TechCorp", "AgriSystems", "MedInnovate", "RetailGiant", "EnergyPlus", "CloudSoft"])
-    
-    st.subheader("Valuation Methods")
-    
-    st.markdown("### DCF Valuation")
-    st.write("**Estimated Value:** $430M")
-    st.write("**Discount Rate:** 12%")
-    st.write("**Terminal Growth Rate:** 3%")
-    
-    st.markdown("### Comparable Companies")
-    st.write("**Average EV/EBITDA Multiple:** 10.5x")
-    st.write("**Estimated Value:** $455M")
-    
-    st.markdown("### Comparable Transactions")
-    st.write("**Average EV/EBITDA Multiple:** 11.2x")
-    st.write("**Estimated Value:** $470M")
-    
-    st.markdown("### Valuation Summary")
-    st.write("**Recommended Offer Range:** $440M - $465M")
-
-elif page == "Due Diligence":
-    st.header("Due Diligence Tracker")
-    
-    st.selectbox("Select Deal", ["TechCorp", "MedInnovate", "CloudSoft"])
-    
-    st.subheader("Due Diligence Categories")
-    
-    categories = [
-        {"name": "Financial", "status": "In Progress", "completion": "75%"},
-        {"name": "Legal", "status": "In Progress", "completion": "60%"},
-        {"name": "Commercial", "status": "Completed", "completion": "100%"},
-        {"name": "IT", "status": "In Progress", "completion": "40%"},
-        {"name": "HR", "status": "Not Started", "completion": "0%"},
-        {"name": "Intellectual Property", "status": "In Progress", "completion": "80%"},
-    ]
-    
-    for category in categories:
-        st.markdown(f"**{category['name']}** - {category['status']} ({category['completion']})")
-    
-    st.subheader("Recent Findings")
-    st.write("- Revenue recognition policies require further investigation")
-    st.write("- Two pending legal claims identified in overseas subsidiaries")
-    st.write("- Customer concentration higher than initially reported (top client = 25%)")
-    
-    st.subheader("Document Repository")
-    st.write("Total documents: 347")
-    st.write("Reviewed documents: 212")
-
-# Footer
 st.markdown("---")
-st.markdown("<p style='text-align: center;'>© 2025 SAMAR.AI | Version 1.0</p>", unsafe_allow_html=True)
+
+# Sidebar for navigation and options
+with st.sidebar:
+    st.header("Navigation")
+    page = st.radio("Go to", ["Company Analysis", "M&A Recommendations", "About"])
+    
+    st.markdown("---")
+    
+    st.header("Model Options")
+    model = st.selectbox(
+        "Select LLM Model",
+        ["databricks-meta-llama-3-3-70b-instruct", "databricks-llama-2-70b-chat"],
+        index=0
+    )
+    
+    temperature = st.slider("Temperature", 0.0, 1.0, 0.2, 0.1)
+    
+    st.markdown("---")
+    st.markdown("© 2025 SAMAR.AI")
+
+# Main content logic based on selected page
+if page == "Company Analysis":
+    st.header("Company Analysis Dashboard")
+    
+    # Company input section
+    company_name = st.text_input("Enter company name:", "")
+    
+    analyze_button = st.button("Analyze Company")
+    
+    # Display analysis results when button is clicked
+    if analyze_button and company_name:
+        with st.spinner(f"Analyzing {company_name}..."):
+            # Create message for LLM
+            prompt = f"""
+            Provide a comprehensive analysis of {company_name} for M&A purposes with the following structure:
+            1. Company Overview (brief description, industry, founding year)
+            2. Financial Health (revenue, profit margins, growth trends)
+            3. Market Position (market share, competitive advantage, threats)
+            4. Key Assets (intellectual property, talent, technology)
+            5. Potential Synergies (areas of value for acquisition/merger)
+            6. Risk Assessment (regulatory, financial, operational risks)
+            7. Valuation Estimate (approximate worth and justification)
+            
+            Format the information clearly with headers.
+            """
+            
+            # Get response from LLM
+            messages = [HumanMessage(content=prompt)]
+            updated_messages, input_tokens, output_tokens = chat_instance.invoke_llm_langchain(
+                messages, 
+                model=model, 
+                temperature=temperature
+            )
+            
+            # Extract and display AI response
+            company_analysis = updated_messages[-1].content
+            
+            # Display token usage
+            col1, col2 = st.columns(2)
+            with col1:
+                st.caption(f"Input tokens: {input_tokens}")
+            with col2:
+                st.caption(f"Output tokens: {output_tokens}")
+            
+            # Display the analysis in an expandable container
+            with st.expander("Company Analysis Results", expanded=True):
+                st.markdown(company_analysis)
+            
+            # Create mock data for dashboard visualizations
+            st.subheader("Financial Overview")
+            
+            # Mock financial data visualization
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                # Revenue chart
+                chart_data = pd.DataFrame({
+                    'Year': ['2022', '2023', '2024', '2025 (Proj)'],
+                    'Revenue (millions)': [100, 120, 160, 200]
+                })
+                
+                chart = alt.Chart(chart_data).mark_bar().encode(
+                    x='Year',
+                    y='Revenue (millions)',
+                    color=alt.value('#1f77b4')
+                ).properties(
+                    title=f"{company_name} Revenue Trend"
+                )
+                st.altair_chart(chart, use_container_width=True)
+            
+            with col2:
+                # Profitability chart
+                profit_data = pd.DataFrame({
+                    'Metric': ['Gross Margin', 'Operating Margin', 'Net Margin'],
+                    'Percentage': [45, 22, 15]
+                })
+                
+                chart = alt.Chart(profit_data).mark_bar().encode(
+                    x='Metric',
+                    y='Percentage',
+                    color=alt.value('#2ca02c')
+                ).properties(
+                    title=f"{company_name} Profitability Metrics (%)"
+                )
+                st.altair_chart(chart, use_container_width=True)
+            
+            # SWOT Analysis section
+            st.subheader("SWOT Analysis")
+            
+            col1, col2 = st.columns(2)
+            with col1:
+                st.markdown("##### Strengths")
+                st.info("• Generated based on LLM analysis\n• Key company capabilities\n• Competitive advantages")
+                
+                st.markdown("##### Weaknesses")
+                st.warning("• Generated based on LLM analysis\n• Areas for improvement\n• Competitive disadvantages")
+            
+            with col2:
+                st.markdown("##### Opportunities")
+                st.success("• Generated based on LLM analysis\n• Market trends favorable to company\n• Potential growth areas")
+                
+                st.markdown("##### Threats")
+                st.error("• Generated based on LLM analysis\n• Market challenges\n• Competitive pressures")
+
+elif page == "M&A Recommendations":
+    st.header("M&A Recommendation Engine")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("Target Company")
+        target_company = st.text_input("Enter target company:", "")
+    
+    with col2:
+        st.subheader("Acquiring Company")
+        acquiring_company = st.text_input("Enter acquiring company:", "")
+    
+    if st.button("Generate M&A Analysis"):
+        if target_company and acquiring_company:
+            with st.spinner(f"Analyzing potential merger between {acquiring_company} and {target_company}..."):
+                # Create message for LLM
+                prompt = f"""
+                Provide a comprehensive M&A analysis for {acquiring_company} acquiring {target_company}:
+                1. Strategic Fit (alignment of business models, cultures, and goals)
+                2. Financial Analysis (deal structure, premium, expected synergies)
+                3. Integration Challenges (technical, cultural, operational)
+                4. Regulatory Concerns (antitrust issues, required approvals)
+                5. Market Response (likely stakeholder reactions)
+                6. Recommendation (proceed, reconsider, or alternative approaches)
+                
+                Format the information clearly with headers.
+                """
+                
+                # Get response from LLM
+                messages = [HumanMessage(content=prompt)]
+                updated_messages, input_tokens, output_tokens = chat_instance.invoke_llm_langchain(
+                    messages, 
+                    model=model, 
+                    temperature=temperature
+                )
+                
+                # Extract and display AI response
+                analysis = updated_messages[-1].content
+                st.markdown(analysis)
+        else:
+            st.warning("Please enter both target and acquiring company names.")
+
+else:  # About page
+    st.header("About SAMAR.AI")
+    
+    st.markdown("""
+    ## Strategic Acquisition & Merger Analysis Resource
+    
+    SAMAR.AI is an advanced platform designed to assist in mergers and acquisitions analysis, 
+    similar to services provided by top consulting firms like BCG. Our platform leverages 
+    state-of-the-art language models to provide comprehensive insights and analysis.
+    
+    ### Key Features:
+    - Company analysis and evaluation
+    - M&A compatibility assessment
+    - Financial projection modeling
+    - Risk assessment and mitigation strategies
+    - Integration planning assistance
+    
+    ### Technology Stack:
+    - Advanced LLM integration via Databricks
+    - Interactive visualizations with Streamlit
+    - Custom analytics engine for M&A-specific insights
+    
+    ### Contact Us:
+    For more information or to schedule a demo, please contact our team at info@samar-ai.com
+    """)
+
+# Add a footer
+st.markdown("---")
+st.caption("SAMAR.AI - Powered by advanced LLM technology")
