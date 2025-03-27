@@ -97,7 +97,7 @@ class FinAgentNodes:
         """
         proceed = self.approval
         
-        if proceed == 'yes':
+        if proceed == 1:
             state.current_step = "human_approval_confirmed"
             return state
         
