@@ -8,7 +8,7 @@ from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeSt
 from pydantic import BaseModel, Field
 from agents.states import MnAagentState
 from tools.websearcher import TavilySearchTool
-from RAG.rag_llama import RAG
+from RAG.rag_llama_demo import RAG
 import uuid
 import sys
 sys.setrecursionlimit(10000)

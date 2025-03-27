@@ -3,7 +3,7 @@ from typing import TypedDict, Dict, List, Any, Optional
 from agents.states import MnAagentState
 from datetime import datetime
 from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeStyles
-from RAG.rag_llama import RAG
+from RAG.rag_llama_demo import RAG
 import logging
 import os
 from langgraph.graph import StateGraph, END

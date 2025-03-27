@@ -26,13 +26,13 @@ def create_sequential_workflow(mn_agent_state: MnAagentState):
     first processing Company A, then Company B
     """
     # Initialize agent nodes for both companies
-    research_agent_a = ResearchAgentNodes(mn_agent_state, 'a')
-    fin_agent_a = FinAgentNodes(mn_agent_state, 'a')
-    ops_agent_a = OpsAgentNodes(mn_agent_state, 'a')
+    research_agent_a = ResearchAgentNodes(mn_agent_state, 'a', approval=True)
+    fin_agent_a = FinAgentNodes(mn_agent_state, 'a', approval=True)
+    ops_agent_a = OpsAgentNodes(mn_agent_state, 'a', approval=True)
     
-    research_agent_b = ResearchAgentNodes(mn_agent_state, 'b')
-    fin_agent_b = FinAgentNodes(mn_agent_state, 'b')
-    ops_agent_b = OpsAgentNodes(mn_agent_state, 'b')
+    research_agent_b = ResearchAgentNodes(mn_agent_state, 'b', approval=True)
+    fin_agent_b = FinAgentNodes(mn_agent_state, 'b', approval=True)
+    ops_agent_b = OpsAgentNodes(mn_agent_state, 'b', approval=True)
     
     # Define the graph workflow
     workflow = StateGraph(MnAagentState)
