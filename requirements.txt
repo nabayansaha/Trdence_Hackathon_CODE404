@@ -4,3 +4,11 @@ matplotlib
 altair
 python-dotenv
 openai
+langchain-core
+llama-index-core
+llama-index-vector-stores-chroma
+langchain-community
+chromadb
+pyyaml
+huggingface-hub
+sentence-transformers
