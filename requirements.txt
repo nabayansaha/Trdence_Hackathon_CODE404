@@ -1,2 +1,9 @@
 streamlit==1.38.0
 datetime
+pandas
+matplotlib
+altair
+dotenv
+openai
+typing
+time
