@@ -19,7 +19,8 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 class FinAgentNodes:
-    def __init__(self, state: MnAagentState, company: str):
+    def __init__(self, state: MnAagentState, company: str, approval: bool = True):
+        self.approval = approval
         self.state = state
         if company == 'a':
             self.company_name = state.company_a_name
@@ -94,7 +95,7 @@ class FinAgentNodes:
         """
         Ask human whether to proceed with search
         """
-        proceed = input("\nDo you want to proceed with the report? (yes/no): ").lower().strip()
+        proceed = self.approval
         
         if proceed == 'yes':
             state.current_step = "human_approval_confirmed"
