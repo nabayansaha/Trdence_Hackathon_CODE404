@@ -12,3 +12,4 @@ chromadb
 pyyaml
 huggingface-hub
 sentence-transformers
+llama-index-embeddings-langchain
