@@ -1,9 +1,6 @@
 streamlit==1.38.0
-datetime
 pandas
 matplotlib
 altair
-dotenv
+python-dotenv
 openai
-typing
-time
