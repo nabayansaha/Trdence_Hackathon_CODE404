@@ -1,244 +1,213 @@
 import streamlit as st
-from utils.chat import Chat
-from utils.messages import HumanMessage, AIMessage
-import pandas as pd
-import matplotlib.pyplot as plt
-import altair as alt
+import os
+from RAG.rag_llama_demo import RAG
+import tempfile
+import uuid
 
-# Set page configuration
-st.set_page_config(
-    page_title="SAMAR.AI - M&A Analysis Platform",
-    page_icon="💼",
-    layout="wide"
+st.set_page_config(page_title="Document Q&A System", page_icon="📚", layout="wide")
+
+# Initialize session state variables if they don't exist
+if "rag_instances" not in st.session_state:
+    st.session_state.rag_instances = {}
+if "indexes" not in st.session_state:
+    st.session_state.indexes = {}
+if "retrievers" not in st.session_state:
+    st.session_state.retrievers = {}
+if "company_files" not in st.session_state:
+    st.session_state.company_files = {"company_a": None, "company_b": None}
+if "db_names" not in st.session_state:
+    st.session_state.db_names = {"company_a": None, "company_b": None}
+
+
+def get_unique_db_name(company):
+    """Generate a unique database name for a company"""
+    if st.session_state.db_names[company] is None:
+        st.session_state.db_names[company] = f"{company}_{str(uuid.uuid4())[:8]}"
+    return st.session_state.db_names[company]
+
+
+def save_uploaded_file(uploaded_file):
+    """Save uploaded file and return the path"""
+    if uploaded_file is not None:
+        # Create a temporary file
+        temp_dir = tempfile.mkdtemp()
+        file_path = os.path.join(temp_dir, uploaded_file.name)
+
+        # Write the file
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        return file_path
+    return None
+
+
+def initialize_rag(company, file_path):
+    """Initialize or update RAG instance for a company"""
+    if file_path:
+        # Clear existing database name if it exists
+        if st.session_state.db_names[company] is not None:
+            # Clean up old database if needed
+            try:
+                import shutil
+
+                old_db_path = os.path.join(
+                    "chroma_db", st.session_state.db_names[company]
+                )
+                if os.path.exists(old_db_path):
+                    shutil.rmtree(old_db_path)
+            except Exception as e:
+                st.error(f"Error cleaning up old database: {str(e)}")
+            st.session_state.db_names[company] = None
+            # Clear other resources
+            if company in st.session_state.rag_instances:
+                del st.session_state.rag_instances[company]
+            if company in st.session_state.indexes:
+                del st.session_state.indexes[company]
+            if company in st.session_state.retrievers:
+                del st.session_state.retrievers[company]
+
+        # Generate new unique database name
+        db_name = get_unique_db_name(company)
+
+        try:
+            # Initialize new RAG instance
+            st.session_state.rag_instances[company] = RAG(file_path)
+            st.session_state.indexes[company] = st.session_state.rag_instances[
+                company
+            ].create_db(db_name=db_name)
+            st.session_state.retrievers[company] = st.session_state.indexes[
+                company
+            ].as_retriever()
+            st.session_state.company_files[company] = file_path
+            return True
+        except Exception as e:
+            st.error(f"Error initializing RAG: {str(e)}")
+            # Clean up on failure
+            if os.path.exists(os.path.join("chroma_db", db_name)):
+                shutil.rmtree(os.path.join("chroma_db", db_name))
+            st.session_state.db_names[company] = None
+            return False
+    return False
+
+
+# Sidebar for file uploads and system status
+with st.sidebar:
+    st.title("📚 Document Upload")
+    st.write("Upload documents for both companies")
+
+    # File upload for Company A
+    company_a_file = st.file_uploader(
+        "Upload Company A Document (PDF/TXT)", type=["pdf", "txt"], key="company_a"
+    )
+    if company_a_file and company_a_file != st.session_state.company_files["company_a"]:
+        file_path = save_uploaded_file(company_a_file)
+        if initialize_rag("company_a", file_path):
+            st.success("Company A document processed successfully!")
+
+    # File upload for Company B
+    company_b_file = st.file_uploader(
+        "Upload Company B Document (PDF/TXT)", type=["pdf", "txt"], key="company_b"
+    )
+    if company_b_file and company_b_file != st.session_state.company_files["company_b"]:
+        file_path = save_uploaded_file(company_b_file)
+        if initialize_rag("company_b", file_path):
+            st.success("Company B document processed successfully!")
+
+# Main content area
+st.title("🤖 Document Q&A System")
+
+# Action selection
+action = st.radio(
+    "Choose an action:", ["Query Documents", "Update Documents"], horizontal=True
 )
 
-# Initialize Chat instance
-@st.cache_resource
-def get_chat_instance():
-    return Chat()
+if action == "Query Documents":
+    # Query interface
+    company = st.selectbox(
+        "Select Company:",
+        ["company_a", "company_b"],
+        format_func=lambda x: "Company A" if x == "company_a" else "Company B",
+    )
 
-chat_instance = get_chat_instance()
-
-# App header
-col1, col2 = st.columns([3, 1])
-with col1:
-    st.title("🚀 SAMAR.AI")
-    st.subheader("Strategic Acquisition & Merger Analysis Resource")
-with col2:
-    st.image("https://via.placeholder.com/150?text=SAMAR.AI", width=150)
-
-st.markdown("---")
-
-# Sidebar for navigation and options
-with st.sidebar:
-    st.header("Navigation")
-    page = st.radio("Go to", ["Company Analysis", "M&A Recommendations", "About"])
-    
-    st.markdown("---")
-    
-    # Fixed model selection - only one option
-    model = "databricks-meta-llama-3-3-70b-instruct"
-    st.info(f"Using model: {model}")
-    
-    # Temperature setting
-    temperature = st.slider("Response Creativity", 0.0, 1.0, 0.2, 0.1, 
-                           help="Lower values produce more focused, deterministic responses. Higher values produce more creative, varied responses.")
-    
-    st.markdown("---")
-    st.markdown("© 2025 SAMAR.AI")
-    st.caption(f"Current user: bibhabasuiitkgp")
-    st.caption(f"Last updated: 2025-03-27")
-
-# Main content logic based on selected page
-if page == "Company Analysis":
-    st.header("Company Analysis Dashboard")
-    
-    # Company input section
-    company_name = st.text_input("Enter company name:", "")
-    
-    analyze_button = st.button("Analyze Company")
-    
-    # Display analysis results when button is clicked
-    if analyze_button and company_name:
-        with st.spinner(f"Analyzing {company_name}..."):
-            try:
-                # Create message for LLM
-                prompt = f"""
-                Provide a comprehensive analysis of {company_name} for M&A purposes with the following structure:
-                1. Company Overview (brief description, industry, founding year)
-                2. Financial Health (revenue, profit margins, growth trends)
-                3. Market Position (market share, competitive advantage, threats)
-                4. Key Assets (intellectual property, talent, technology)
-                5. Potential Synergies (areas of value for acquisition/merger)
-                6. Risk Assessment (regulatory, financial, operational risks)
-                7. Valuation Estimate (approximate worth and justification)
-                
-                Format the information clearly with headers.
-                """
-                
-                # Get response from LLM
-                messages = [HumanMessage(content=prompt)]
-                updated_messages, input_tokens, output_tokens = chat_instance.invoke_llm_langchain(
-                    messages, 
-                    model=model, 
-                    temperature=temperature
-                )
-                
-                # Extract and display AI response
-                company_analysis = updated_messages[-1].content
-                
-                # Display token usage
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.caption(f"Input tokens: {input_tokens}")
-                with col2:
-                    st.caption(f"Output tokens: {output_tokens}")
-                
-                # Display the analysis in an expandable container
-                with st.expander("Company Analysis Results", expanded=True):
-                    st.markdown(company_analysis)
-                
-                # Create mock data for dashboard visualizations
-                st.subheader("Financial Overview")
-                
-                # Mock financial data visualization
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    # Revenue chart
-                    chart_data = pd.DataFrame({
-                        'Year': ['2022', '2023', '2024', '2025 (Proj)'],
-                        'Revenue (millions)': [100, 120, 160, 200]
-                    })
-                    
-                    chart = alt.Chart(chart_data).mark_bar().encode(
-                        x='Year',
-                        y='Revenue (millions)',
-                        color=alt.value('#1f77b4')
-                    ).properties(
-                        title=f"{company_name} Revenue Trend"
-                    )
-                    st.altair_chart(chart, use_container_width=True)
-                
-                with col2:
-                    # Profitability chart
-                    profit_data = pd.DataFrame({
-                        'Metric': ['Gross Margin', 'Operating Margin', 'Net Margin'],
-                        'Percentage': [45, 22, 15]
-                    })
-                    
-                    chart = alt.Chart(profit_data).mark_bar().encode(
-                        x='Metric',
-                        y='Percentage',
-                        color=alt.value('#2ca02c')
-                    ).properties(
-                        title=f"{company_name} Profitability Metrics (%)"
-                    )
-                    st.altair_chart(chart, use_container_width=True)
-                
-                # SWOT Analysis section
-                st.subheader("SWOT Analysis")
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    st.markdown("##### Strengths")
-                    st.info("• Generated based on LLM analysis\n• Key company capabilities\n• Competitive advantages")
-                    
-                    st.markdown("##### Weaknesses")
-                    st.warning("• Generated based on LLM analysis\n• Areas for improvement\n• Competitive disadvantages")
-                
-                with col2:
-                    st.markdown("##### Opportunities")
-                    st.success("• Generated based on LLM analysis\n• Market trends favorable to company\n• Potential growth areas")
-                    
-                    st.markdown("##### Threats")
-                    st.error("• Generated based on LLM analysis\n• Market challenges\n• Competitive pressures")
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-                st.info("Please check your API connection and try again.")
-
-elif page == "M&A Recommendations":
-    st.header("M&A Recommendation Engine")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        st.subheader("Target Company")
-        target_company = st.text_input("Enter target company:", "")
-    
-    with col2:
-        st.subheader("Acquiring Company")
-        acquiring_company = st.text_input("Enter acquiring company:", "")
-    
-    if st.button("Generate M&A Analysis"):
-        if target_company and acquiring_company:
-            with st.spinner(f"Analyzing potential merger between {acquiring_company} and {target_company}..."):
+    if (
+        company not in st.session_state.retrievers
+        or not st.session_state.retrievers[company]
+    ):
+        st.warning(
+            f"Please upload a document for {company.replace('_', ' ').title()} first!"
+        )
+    else:
+        query = st.text_input("Enter your query:")
+        if st.button("Submit Query") and query:
+            with st.spinner("Processing query..."):
                 try:
-                    # Create message for LLM
-                    prompt = f"""
-                    Provide a comprehensive M&A analysis for {acquiring_company} acquiring {target_company}:
-                    1. Strategic Fit (alignment of business models, cultures, and goals)
-                    2. Financial Analysis (deal structure, premium, expected synergies)
-                    3. Integration Challenges (technical, cultural, operational)
-                    4. Regulatory Concerns (antitrust issues, required approvals)
-                    5. Market Response (likely stakeholder reactions)
-                    6. Recommendation (proceed, reconsider, or alternative approaches)
-                    
-                    Format the information clearly with headers.
-                    """
-                    
-                    # Get response from LLM
-                    messages = [HumanMessage(content=prompt)]
-                    updated_messages, input_tokens, output_tokens = chat_instance.invoke_llm_langchain(
-                        messages, 
-                        model=model, 
-                        temperature=temperature
+                    response = st.session_state.rag_instances[company].rag_query(
+                        query, st.session_state.retrievers[company]
                     )
-                    
-                    # Extract and display AI response
-                    analysis = updated_messages[-1].content
-                    
-                    # Display token usage
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        st.caption(f"Input tokens: {input_tokens}")
-                    with col2:
-                        st.caption(f"Output tokens: {output_tokens}")
-                    
-                    # Display the analysis
-                    st.markdown(analysis)
+                    st.write("### Answer:")
+                    st.write(response["result"])
                 except Exception as e:
                     st.error(f"An error occurred: {str(e)}")
-                    st.info("Please check your API connection and try again.")
-        else:
-            st.warning("Please enter both target and acquiring company names.")
 
-else:  # About page
-    st.header("About SAMAR.AI")
-    
-    st.markdown("""
-    ## Strategic Acquisition & Merger Analysis Resource
-    
-    SAMAR.AI is an advanced platform designed to assist in mergers and acquisitions analysis, 
-    similar to services provided by top consulting firms like BCG. Our platform leverages 
-    state-of-the-art language models to provide comprehensive insights and analysis.
-    
-    ### Key Features:
-    - Company analysis and evaluation
-    - M&A compatibility assessment
-    - Financial projection modeling
-    - Risk assessment and mitigation strategies
-    - Integration planning assistance
-    
-    ### Technology Stack:
-    - Advanced LLM integration via Databricks (Llama 3 70B)
-    - Interactive visualizations with Streamlit
-    - Custom analytics engine for M&A-specific insights
-    
-    ### Contact Us:
-    For more information or to schedule a demo, please contact our team at info@samar-ai.com
-    """)
+elif action == "Update Documents":
+    # Update interface
+    company = st.selectbox(
+        "Select Company to Update:",
+        ["company_a", "company_b"],
+        format_func=lambda x: "Company A" if x == "company_a" else "Company B",
+    )
 
-# Add a footer
+    update_type = st.radio(
+        "Choose update method:", ["Upload File", "Enter Text"], horizontal=True
+    )
+
+    if update_type == "Upload File":
+        new_file = st.file_uploader("Upload new document", type=["pdf", "txt"])
+        if new_file:
+            file_path = save_uploaded_file(new_file)
+            if st.button("Update Database"):
+                with st.spinner("Updating database..."):
+                    try:
+                        with open(file_path, "r", encoding="utf-8") as file:
+                            new_text = file.read()
+                        if company in st.session_state.rag_instances:
+                            db_name = st.session_state.db_names[company]
+                            st.session_state.rag_instances[company].text = new_text
+                            st.session_state.indexes[company] = (
+                                st.session_state.rag_instances[company].update_db(
+                                    db_name=db_name, new_text=new_text
+                                )
+                            )
+                            st.session_state.retrievers[company] = (
+                                st.session_state.indexes[company].as_retriever()
+                            )
+                            st.success("Database updated successfully!")
+                        else:
+                            st.error("Please upload initial document first!")
+                    except Exception as e:
+                        st.error(f"An error occurred: {str(e)}")
+
+    else:  # Enter Text
+        new_text = st.text_area("Enter new text to add:", height=200)
+        if st.button("Update Database") and new_text:
+            with st.spinner("Updating database..."):
+                try:
+                    if company in st.session_state.rag_instances:
+                        db_name = st.session_state.db_names[company]
+                        st.session_state.rag_instances[company].text = new_text
+                        st.session_state.indexes[company] = (
+                            st.session_state.rag_instances[company].update_db(
+                                db_name=db_name, new_text=new_text
+                            )
+                        )
+                        st.session_state.retrievers[company] = st.session_state.indexes[
+                            company
+                        ].as_retriever()
+                        st.success("Database updated successfully!")
+                    else:
+                        st.error("Please upload initial document first!")
+                except Exception as e:
+                    st.error(f"An error occurred: {str(e)}")
+
+# Footer
 st.markdown("---")
-st.caption("SAMAR.AI - Powered by advanced LLM technology")
+st.markdown("Made with ❤️ by Team CODE404")
