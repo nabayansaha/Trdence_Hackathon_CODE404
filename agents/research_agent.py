@@ -8,25 +8,29 @@ from langchain_core.runnables.graph import CurveStyle, MermaidDrawMethod, NodeSt
 from pydantic import BaseModel, Field
 from agents.states import MnAagentState
 from tools.websearcher import TavilySearchTool
-from RAG.rag_llama import RAG
+from RAG.rag_llama_demo import RAG
 import uuid
 import sys
+
 sys.setrecursionlimit(10000)
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[logging.StreamHandler()]
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    handlers=[logging.StreamHandler()],
 )
 logger = logging.getLogger(__name__)
+
 
 class ResearchAgentNodes:
     def __init__(self, state: MnAagentState, company: str):
         self.state = state
         self.company = company
-        self.company_name = state.company_a_name if company == 'a' else state.company_b_name
+        self.company_name = (
+            state.company_a_name if company == "a" else state.company_b_name
+        )
         self.search_tool = TavilySearchTool()
-        
+
         # Load prompts
         current_dir = os.path.dirname(os.path.abspath(__file__))
         project_root = os.path.dirname(current_dir)
@@ -36,39 +40,55 @@ class ResearchAgentNodes:
         logger.info(f"Loaded prompts from {prompts_path}")
 
     def generate_queries(self, state: MnAagentState) -> MnAagentState:
-        """
-        Generate search queries for the company
-        """
+        """Generate search queries for the company"""
         queries = []
-        for line in self.prompts["web_Fin_prompt"].strip().split('\n'):
-            queries.append(line.format(company_name = str(self.company_name)))
-        
+        for line in self.prompts["web_Fin_prompt"].strip().split("\n"):
+            queries.append(line.format(company_name=str(self.company_name)))
+
         # Determine which search results list to update based on company
-        search_results_key = 'search_results_a' if self.company == 'a' else 'search_results_b'
-        
+        search_results_key = (
+            "search_results_a" if self.company == "a" else "search_results_b"
+        )
+
         # Update state with queries and reset search results
         setattr(state, search_results_key, [])
         state.current_step = "generate_queries"
         state.queries = queries
-        
-        # Print queries for human review
-        print("\n--- Generated Queries ---")
+
+        # Display queries in Streamlit
+        import streamlit as st
+
+        st.write(f"### Generated Queries for {self.company_name}")
         for i, query in enumerate(queries, 1):
-            print(f"{i}. {query}")
-        
+            st.write(f"{i}. {query}")
+
+        # Store total number of queries for progress tracking
+        if "total_queries" not in st.session_state:
+            st.session_state.total_queries = {}
+        st.session_state.total_queries[self.company] = len(queries)
+
         return state
 
     def human_approval(self, state: MnAagentState) -> MnAagentState:
-        """
-        Ask human whether to proceed with search
-        """
-        proceed = input("\nDo you want to proceed with these queries? (yes/no): ").lower().strip()
-        
-        if proceed == 'yes':
+        """Ask for approval via Streamlit interface"""
+        import streamlit as st
+
+        st.write(f"### Approve Queries for {self.company_name}")
+        proceed = st.radio(
+            f"Do you want to proceed with these queries for {self.company_name}?",
+            ["Yes", "No"],
+            key=f"approval_{self.company}",
+        )
+
+        if proceed == "Yes":
             state.current_step = "human_approval_confirmed"
-            return state
-        
-        state.current_step = "human_approval_rejected"
+            # Initialize progress tracking
+            if "queries_completed" not in st.session_state:
+                st.session_state.queries_completed = {}
+            st.session_state.queries_completed[self.company] = 0
+        else:
+            state.current_step = "human_approval_rejected"
+
         return state
 
     def should_continue(self, state: MnAagentState) -> str:
@@ -80,37 +100,68 @@ class ResearchAgentNodes:
         return END
 
     def web_search(self, state: MnAagentState) -> MnAagentState:
-        """
-        Perform web search for current query and update vector DB
-        """
+        """Perform web search for current query and update vector DB"""
+        import streamlit as st
+
         # Determine which search results list to update based on company
-        search_results_key = 'search_results_a' if self.company == 'a' else 'search_results_b'
-        
-        # Get current search results
+        search_results_key = (
+            "search_results_a" if self.company == "a" else "search_results_b"
+        )
         search_results = getattr(state, search_results_key)
-        
+
+        # Create/update progress tracking
+        if "queries_completed" not in st.session_state:
+            st.session_state.queries_completed = {}
+        if self.company not in st.session_state.queries_completed:
+            st.session_state.queries_completed[self.company] = 0
+
+        # Show overall progress
+        total_queries = st.session_state.total_queries[self.company]
+        progress = st.session_state.queries_completed[self.company] / total_queries
+
+        # Create or get progress bar
+        if "progress_bar" not in st.session_state:
+            st.session_state.progress_bar = {}
+        if self.company not in st.session_state.progress_bar:
+            st.session_state.progress_bar[self.company] = st.progress(0.0)
+
+        # Update progress bar
+        st.session_state.progress_bar[self.company].progress(progress)
+
         # Perform search if queries exist
         if state.queries:
             current_query = state.queries.pop(0)
-            print(f"\nSearching: {current_query}")
-            
+
+            # Show current query
+            st.write(
+                f"🔍 Processing query {st.session_state.queries_completed[self.company] + 1}/{total_queries}"
+            )
+
             # Perform web search
             response = self.search_tool.invoke_tool(current_query)
             search_results.append({"query": current_query, "result": response})
-            
+
             # Update search results in state
             setattr(state, search_results_key, search_results)
-            
+
             # Update RAG index
-            # rag_instance = self.state.rag_instances[self.company_name]
-            print((response))
-            self.state.rag_instances[self.company_name].text = self.state.rag_instances[self.company_name].text + response
-            self.state.rag_instances[self.company_name].update_db(
-                db_name=self.company_name, 
-                new_text=response
+            self.state.rag_instances[self.company_name].text = (
+                self.state.rag_instances[self.company_name].text + response
             )
+            self.state.rag_instances[self.company_name].update_db(
+                db_name=self.company_name, new_text=response
+            )
+
+            # Update progress
+            st.session_state.queries_completed[self.company] += 1
+            new_progress = (
+                st.session_state.queries_completed[self.company] / total_queries
+            )
+            st.session_state.progress_bar[self.company].progress(new_progress)
+
         state.current_step = "web_search"
         return state
+
 
 def create_research_agent_graph(mn_agent_state: MnAagentState, company: str):
     """
@@ -118,35 +169,33 @@ def create_research_agent_graph(mn_agent_state: MnAagentState, company: str):
     """
     # Initialize research agent nodes
     research_agent = ResearchAgentNodes(mn_agent_state, company)
-    
+
     # Define the graph workflow
     workflow = StateGraph(MnAagentState)
-    
+
     # Add nodes
     workflow.add_node("generate_queries", research_agent.generate_queries)
     workflow.add_node("human_approval", research_agent.human_approval)
     workflow.add_node("web_search", research_agent.web_search)
-    
+
     # Define edges
     workflow.set_entry_point("generate_queries")
     workflow.add_edge("generate_queries", "human_approval")
     workflow.add_conditional_edges(
-        "human_approval", 
-        lambda state: "continue_search" if state.current_step == "human_approval_confirmed" else END,
-        {
-            "continue_search": "web_search",
-            END: END
-        }
+        "human_approval",
+        lambda state: (
+            "continue_search"
+            if state.current_step == "human_approval_confirmed"
+            else END
+        ),
+        {"continue_search": "web_search", END: END},
     )
     workflow.add_conditional_edges(
-        "web_search", 
+        "web_search",
         research_agent.should_continue,
-        {
-            "continue_search": "web_search",
-            END: END
-        }
+        {"continue_search": "web_search", END: END},
     )
-    
+
     compiled_graph = workflow.compile()
     try:
         output_dir = "assets"
@@ -159,15 +208,16 @@ def create_research_agent_graph(mn_agent_state: MnAagentState, company: str):
             output_file_path=None,
             draw_method=MermaidDrawMethod.PYPPETEER,
             background_color="white",
-            padding=10
+            padding=10,
         )
         with open(output_path, "wb") as f:
-            f.write(graph_image)  
+            f.write(graph_image)
         logger.info(f"Graph visualization saved to {output_path}")
     except Exception as e:
         logger.warning(f"Could not save graph visualization: {e}")
-    
+
     return compiled_graph
+
 
 # Main execution would look like this in the main script
 if __name__ == "__main__":
@@ -175,18 +225,18 @@ if __name__ == "__main__":
     rag_instances = {}
     indexes = {}
     retrievers = {}
-    
+
     company_docs = {
         "Reliance_Industries_Limited": "/home/naba/Desktop/backend/RIL-Integrated-Annual-Report-2023-24_parsed.txt",
-        "180_Degree_Consulting": "/home/naba/Desktop/backend/dc.txt"
+        "180_Degree_Consulting": "/home/naba/Desktop/backend/dc.txt",
     }
-    
+
     for company, text_path in company_docs.items():
         logger.info(f"Initializing RAG for {company} with document: {text_path}")
         rag_instances[company] = RAG(text_path)
         indexes[company] = rag_instances[company].create_db(db_name=str(company))
         retrievers[company] = indexes[company].as_retriever()
-    
+
     # Initialize MnAagentState with RAG instances
     initial_state = MnAagentState(
         company_a_name="Reliance_Industries_Limited",
@@ -195,9 +245,13 @@ if __name__ == "__main__":
         company_b_doc="/home/naba/Desktop/backend/dc.txt",
         rag_instances=rag_instances,
         indexes=indexes,
-        retrievers=retrievers
+        retrievers=retrievers,
     )
-    research_graph = create_research_agent_graph(initial_state, 'a')
+    research_graph = create_research_agent_graph(initial_state, "a")
+    research_graph1 = create_research_agent_graph(initial_state, "b")
     final_state = research_graph.invoke(initial_state, config={"recursion_limit": 1000})
-    
+    final_state1 = research_graph1.invoke(
+        initial_state, config={"recursion_limit": 1000}
+    )
+
     print("\n--- Vector DB Update Complete ---")
