@@ -30,6 +30,8 @@ class MnAagentState(BaseModel):
     search_iterations: int = Field(default=0, description="Current search iteration")
     risk_check: Dict[str, Any] = Field(default_factory=dict, description="Risk assessment for each company")
     antitrust_assessment: Dict[str, Any] = Field(default_factory=dict, description="Antitrust assessment for each company")
+    iteration_tracker: Dict[str, int] = Field(default_factory=lambda: {'a': 0, 'b': 0}, 
+                                               description="Tracker for search iterations per company")
     model_config = ConfigDict(
         arbitrary_types_allowed=True  # Add this line
     )
