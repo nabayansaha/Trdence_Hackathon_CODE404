@@ -3,17 +3,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from typing import List, Tuple, Union
 import time
-from dataclasses import dataclass
-
-@dataclass
-class HumanMessage:
-    content: str
-    role: str = "user"
-
-@dataclass
-class AIMessage:
-    content: str
-    role: str = "assistant"
+from utils.messages import HumanMessage, AIMessage
 
 class Chat:
     def __init__(self):
