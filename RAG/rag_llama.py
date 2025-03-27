@@ -238,8 +238,8 @@ class RAG:
 
 if __name__ == "__main__":
     company_docs = {
-        "company_a": "/home/naba/Desktop/backend/RIL-Integrated-Annual-Report-2023-24_parsed.txt",
-        "company_b": "/home/naba/Desktop/backend/dc.txt"
+        "company_a": "./RIL-Integrated-Annual-Report-2023-24_parsed.txt",
+        "company_b": "./backend/dc.txt"
     }
     
     rag_instances = {}
